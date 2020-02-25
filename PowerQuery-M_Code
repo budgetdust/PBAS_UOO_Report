@@ -1,0 +1,20 @@
+let
+    Source = Csv.Document(File.Contents("INSERT_YOUR_FILEPATH_HERE"),[Delimiter=",", Columns=16, Encoding=1252, QuoteStyle=QuoteStyle.None]),
+    #"Removed Blank Rows" = Table.SelectRows(Source, each not List.IsEmpty(List.RemoveMatchingItems(Record.FieldValues(_), {"", null}))),
+    DrillDownReportDate = #"Removed Blank Rows"{2}[Column1],
+    #"Revert to Step 2" = #"Removed Blank Rows",
+    #"Removed Top Rows" = Table.Skip(#"Revert to Step 2",5),
+    #"Promoted Headers" = Table.PromoteHeaders(#"Removed Top Rows", [PromoteAllScalars=true]),
+    #"Removed Bottom 4 Rows" = Table.RemoveLastN(#"Promoted Headers",4),
+    #"Filtered Blank & Heading Rows" = Table.SelectRows(#"Removed Bottom 4 Rows", each ([FY] <> "") and ([Org] <> "Org")),
+    #"Removed Columns" = Table.RemoveColumns(#"Filtered Blank & Heading Rows",{"NAF", "SSN"}),
+    #"Added Report Last Refreshed Column" = Table.AddColumn(#"Removed Columns", "Report Last Refreshed", each Text.Range(DrillDownReportDate,18,11)),
+    #"Replaced Value =""" = Table.ReplaceValue(#"Added Report Last Refreshed Column","=""","",Replacer.ReplaceText,{"Org", "WC", "Tracking #", "Order #", "ProjSub"}),
+    #"Replaced Value """ = Table.ReplaceValue(#"Replaced Value =""","""","",Replacer.ReplaceText,{"Org", "WC", "Tracking #", "Order #", "ProjSub"}),
+    #"Renamed Columns" = Table.RenameColumns(#"Replaced Value """,{{"WC", "Work Center"}, {"ProjSub", "Project SubProject"}}),
+    #"Trimmed Text" = Table.TransformColumns(#"Renamed Columns",{{"FY", Text.Trim, type text}, {"Org", Text.Trim, type text}, {"Work Center", Text.Trim, type text}, {"Tracking #", Text.Trim, type text}, {"Order #", Text.Trim, type text}, {"Project SubProject", Text.Trim, type text}, {"Report Date", Text.Trim, type text}, {"Release Date", Text.Trim, type text}, {"Travel Days", Text.Trim, type text}, {"Pay Days", Text.Trim, type text}, {"Amount", Text.Trim, type text}, {"DMO Trx", Text.Trim, type text}, {"# Trx", Text.Trim, type text}, {"Name", Text.Trim, type text}, {"Report Last Refreshed", Text.Trim, type text}}),
+    #"Cleaned Text" = Table.TransformColumns(#"Trimmed Text",{{"FY", Text.Clean, type text}, {"Org", Text.Clean, type text}, {"Work Center", Text.Clean, type text}, {"Tracking #", Text.Clean, type text}, {"Order #", Text.Clean, type text}, {"Project SubProject", Text.Clean, type text}, {"Report Date", Text.Clean, type text}, {"Release Date", Text.Clean, type text}, {"Travel Days", Text.Clean, type text}, {"Pay Days", Text.Clean, type text}, {"Amount", Text.Clean, type text}, {"DMO Trx", Text.Clean, type text}, {"# Trx", Text.Clean, type text}, {"Name", Text.Clean, type text}, {"Report Last Refreshed", Text.Clean, type text}}),
+    #"Changed Type" = Table.TransformColumnTypes(#"Cleaned Text",{{"Release Date", type date}, {"Report Date", type date}, {"Travel Days", Int64.Type}, {"Pay Days", Int64.Type}, {"Amount", Currency.Type}, {"Report Last Refreshed", type date}}),
+    #"Capitalized Each Word" = Table.TransformColumns(#"Changed Type",{{"Name", Text.Proper, type text}})
+in
+    #"Capitalized Each Word"
